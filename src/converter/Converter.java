@@ -15,7 +15,7 @@ public class Converter {
     private static final Pattern xmlString = Pattern.compile("<.+");
     private static final Pattern openingTag = Pattern.compile("<.+>");
     private static final Pattern closingTag = Pattern.compile("</[^<]+>");
-    private static final Pattern element = Pattern.compile(">.+<");
+    private static final Pattern pElement = Pattern.compile(">.+<");
     private static final Pattern pTagName = Pattern.compile("<\\w+");
     private static final Pattern pAttribute = Pattern.compile("\\w+\\s+=\\s+\"\\w+\"");
     private static final Pattern jsonString = Pattern.compile("\\s*?\\{.+");
@@ -64,7 +64,7 @@ public class Converter {
     private static void parseXmlToJson() {
         Matcher mTagName = pTagName.matcher(xml);
         Matcher mAttribute = pAttribute.matcher(xml);
-        Matcher ele = element.matcher(xml);
+        Matcher mElement = pElement.matcher(xml);
 
         String tagName = null;
         List<String[]> attributes = new ArrayList<>();
@@ -79,8 +79,8 @@ public class Converter {
             String attributeValue = mAttribute.group().substring(mAttribute.group().indexOf("=") + 1).trim();
             attributes.add(new String[] {"\"@" + attributeName + "\"" , attributeValue});
         }
-        if (ele.find()) {
-            element = ele.group().replaceAll("<|>", "\"");
+        if (mElement.find()) {
+            element = mElement.group().replaceAll("<|>", "\"");
         }
         if (attributes.size() != 0) {
             attributes.add(new String[] {"\"#" + tagName + "\"", element});
