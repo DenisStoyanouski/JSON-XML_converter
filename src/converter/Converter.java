@@ -1,7 +1,5 @@
 package converter;
 
-import java.lang.reflect.GenericArrayType;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -10,61 +8,67 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class Converter {
-    private static  String xml;
-
+    private static  String xmlSource;
     private static final Pattern xmlString = Pattern.compile("<.+");
     private static final Pattern openingTag = Pattern.compile("<.+>");
     private static final Pattern closingTag = Pattern.compile("</[^<]+>");
     private static final Pattern pElement = Pattern.compile(">.+<");
     private static final Pattern pTagName = Pattern.compile("<\\w+");
-    private static final Pattern pAttribute = Pattern.compile("\\w+\\s+=\\s+\"\\w+\"");
+    private static final Pattern pAttribute = Pattern.compile("[@#\"\\w]+\\s*?(=|:)\\s*?\"[\\d\\w\\s]+\"?");
+    private static String jsonSource;
     private static final Pattern jsonString = Pattern.compile("\\s*?\\{.+");
-    private static final Pattern pObjectKey = Pattern.compile("\\{\"\\w+\"\\s*?:");
-    private static final Pattern pObjectValue = Pattern.compile(":.+}");
-    private static String json;
+    private static final Pattern pObjectKey = Pattern.compile("\\{\\s*?\"\\w+\"\\s*?:");
 
-    private static Scanner scanner = new Scanner(System.in);
+    private static final Scanner scanner = new Scanner(System.in);
 
     public static void readData() {
-        while(scanner.hasNextLine()) {
-            String input = scanner.nextLine().trim();
-            if (input.matches(xmlString.pattern())) {
-                xml = input;
-                parseXmlToJson();
-            }
-            if (input.matches(jsonString.pattern())) {
-                json = input;
-                parseJsonToXml();
-            }
+        StringBuilder source = new StringBuilder();
+        while (scanner.hasNextLine()) {
+            source.append(scanner.nextLine().replaceAll("\\s+", " "));
+        }
+
+        if (source.toString().matches(xmlString.pattern())) {
+            xmlSource = source.toString();
+            parseXmlToJson();
+        }
+        if (source.toString().matches(jsonString.pattern())) {
+            jsonSource = source.toString();
+            parseJsonToXml();
         }
     }
 
     private static void parseJsonToXml() {
-        Matcher objectKey = pObjectKey.matcher(json);
-        Matcher objectValue = pObjectValue.matcher(json);
-        String key = null;
-        String value = null;
+        Matcher objectKey = pObjectKey.matcher(jsonSource);
+        Matcher objectValue = pAttribute.matcher(jsonSource);
+        String element = null;
+        String content = null;
+        List<String[]> attributes = new ArrayList<>();
 
         if (objectKey.find()) {
-            key = objectKey.group().replaceAll("\\{|\"|:|\\s+", "");
+            element = objectKey.group().replaceAll("\\{|\"|:|\\s+", "");
         }
-        if (objectValue.find()) {
-            value = objectValue.group().replaceAll("}|\"|:|\\s+","");
+        while (objectValue.find()) {
+            String attributeName = objectValue.group().substring(0, objectValue.group().indexOf(":")).replaceAll("[\"\\s+]", "");
+            String attributeValue = objectValue.group().substring(objectValue.group().indexOf(":") + 1).replaceAll("\"", "");
+            if (attributeName.startsWith("@")) {
+                attributes.add(new String[] {attributeName.replaceAll("@",""), attributeValue.trim()});
+            }
+            if (attributeName.startsWith("#")) {
+                content = attributeValue.trim();
+            }
         }
 
-        if ("null".equals(value)) {
-            System.out.printf("<%s/>%n", key);
-        } else {
-            System.out.printf("<%1$s>%2$s</%1$s>", key, value);
-        }
+        System.out.printf("<%s", element);
+        attributes.forEach(x-> System.out.printf(" %s = \"%s\"", x[0], x[1]));
+        System.out.printf(content == null ? "/>%n" : ">%s</%s>", content, element);
 
 
     }
 
     private static void parseXmlToJson() {
-        Matcher mTagName = pTagName.matcher(xml);
-        Matcher mAttribute = pAttribute.matcher(xml);
-        Matcher mElement = pElement.matcher(xml);
+        Matcher mTagName = pTagName.matcher(xmlSource);
+        Matcher mAttribute = pAttribute.matcher(xmlSource);
+        Matcher mElement = pElement.matcher(xmlSource);
 
         String tagName = null;
         List<String[]> attributes = new ArrayList<>();
@@ -80,7 +84,7 @@ public class Converter {
             attributes.add(new String[] {"\"@" + attributeName + "\"" , attributeValue});
         }
         if (mElement.find()) {
-            element = mElement.group().replaceAll("<|>", "\"");
+            element = mElement.group().replaceAll("[<>]", "\"");
         }
         if (attributes.size() != 0) {
             attributes.add(new String[] {"\"#" + tagName + "\"", element});
